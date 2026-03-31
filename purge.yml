@@ -1,0 +1,123 @@
+- name: Purge Proxmox monitoring prep artifacts
+  hosts: proxmox
+  become: true
+  gather_facts: true
+  vars:
+    purge_remove_packages: false
+    purge_remove_textfile_data: true
+    purge_remove_smartctl_exporter: false
+    purge_remove_monitoring_user: false
+
+  tasks:
+    - name: Stop ZFS textfile exporter timer
+      systemd:
+        name: "{{ zfs_textfile_timer_name }}"
+        state: stopped
+        enabled: false
+      failed_when: false
+      when: zfs_textfile_enabled
+
+    - name: Stop ZFS textfile exporter service
+      systemd:
+        name: "{{ zfs_textfile_service_name }}"
+        state: stopped
+      failed_when: false
+      when: zfs_textfile_enabled
+
+    - name: Remove ZFS textfile exporter timer unit
+      file:
+        path: "/etc/systemd/system/{{ zfs_textfile_timer_name }}"
+        state: absent
+      when: zfs_textfile_enabled
+
+    - name: Remove ZFS textfile exporter service unit
+      file:
+        path: "/etc/systemd/system/{{ zfs_textfile_service_name }}"
+        state: absent
+      when: zfs_textfile_enabled
+
+    - name: Remove ZFS textfile exporter script
+      file:
+        path: "{{ zfs_textfile_script_path }}"
+        state: absent
+      when: zfs_textfile_enabled
+
+    - name: Remove generated zfs.prom file
+      file:
+        path: "{{ zfs_textfile_output_file }}"
+        state: absent
+      when:
+        - zfs_textfile_enabled
+        - purge_remove_textfile_data
+
+    - name: Remove ZFS textfile collector directory
+      file:
+        path: "{{ zfs_textfile_directory }}"
+        state: absent
+      when:
+        - zfs_textfile_enabled
+        - purge_remove_textfile_data
+
+    - name: Remove textfile collector ARGS from prometheus-node-exporter defaults
+      lineinfile:
+        path: /etc/default/prometheus-node-exporter
+        regexp: '^ARGS='
+        state: absent
+      failed_when: false
+
+    - name: Reload systemd after removing ZFS units
+      systemd:
+        daemon_reload: true
+
+    - name: Restart prometheus node exporter after purge
+      service:
+        name: "{{ node_exporter_service_name }}"
+        state: restarted
+      failed_when: false
+      when: node_exporter_enabled
+
+    - name: Stop smartctl exporter service
+      systemd:
+        name: smartctl-exporter
+        state: stopped
+        enabled: false
+      failed_when: false
+      when: purge_remove_smartctl_exporter
+
+    - name: Remove smartctl exporter unit
+      file:
+        path: /etc/systemd/system/smartctl-exporter.service
+        state: absent
+      when: purge_remove_smartctl_exporter
+
+    - name: Remove smartctl exporter binary
+      file:
+        path: /usr/local/bin/smartctl_exporter
+        state: absent
+      when: purge_remove_smartctl_exporter
+
+    - name: Remove base packages installed by this repo
+      apt:
+        name: "{{ proxmox_prepare_packages }}"
+        state: absent
+        purge: true
+        autoremove: true
+      when: purge_remove_packages
+
+    - name: Remove Proxmox monitoring ACL once
+      command: "pveum acl delete / --users {{ proxmox_monitoring_user }} --roles PVEAuditor"
+      run_once: true
+      failed_when: false
+      when: purge_remove_monitoring_user
+
+    - name: Remove Proxmox monitoring token once
+      command: "pveum user token delete {{ proxmox_monitoring_user }} {{ proxmox_monitoring_token_name }}"
+      run_once: true
+      failed_when: false
+      when: purge_remove_monitoring_user
+
+    - name: Remove Proxmox monitoring user once
+      command: "pveum user delete {{ proxmox_monitoring_user }}"
+      run_once: true
+      failed_when: false
+      when: purge_remove_monitoring_user
