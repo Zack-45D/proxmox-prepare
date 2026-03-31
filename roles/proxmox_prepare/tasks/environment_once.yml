@@ -1,6 +1,13 @@
 - name: Enable Ceph Prometheus manager module once
   command: ceph mgr module enable prometheus
+  register: ceph_mgr_prometheus_enable
   run_once: true
-  changed_when: false
+  changed_when: "'enabled' in (ceph_mgr_prometheus_enable.stdout | lower)"
   failed_when: false
+  when: ceph_enable_prometheus_module
+
+- name: Show Ceph Prometheus module enable result
+  debug:
+    var: ceph_mgr_prometheus_enable.stdout_lines
+  run_once: true
   when: ceph_enable_prometheus_module

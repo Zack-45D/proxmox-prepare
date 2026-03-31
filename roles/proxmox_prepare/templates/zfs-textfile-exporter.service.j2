@@ -1,0 +1,7 @@
+[Unit]
+Description=Generate ZFS metrics for node_exporter textfile collector
+After=zfs.target
+
+[Service]
+Type=oneshot
+ExecStart={{ zfs_textfile_script_path }}

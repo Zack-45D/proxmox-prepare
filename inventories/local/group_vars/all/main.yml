@@ -16,6 +16,9 @@ smartctl_exporter_port: 9633
 zfs_textfile_enabled: true
 zfs_textfile_directory: /var/lib/node_exporter/textfile_collector
 zfs_textfile_script_path: /usr/local/bin/zfs-textfile-exporter.sh
+zfs_textfile_output_file: /var/lib/node_exporter/textfile_collector/zfs.prom
+zfs_textfile_timer_name: zfs-textfile-exporter.timer
+zfs_textfile_service_name: zfs-textfile-exporter.service
 
 ceph_validation_enabled: true
 ceph_metrics_port: 9283

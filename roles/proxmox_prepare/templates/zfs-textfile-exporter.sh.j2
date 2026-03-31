@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+OUTDIR="{{ zfs_textfile_directory }}"
+TMPFILE="$(mktemp "${OUTDIR}/zfs.prom.XXXXXX")"
+
+state_code() {
+  case "$1" in
+    ONLINE) echo 0 ;;
+    DEGRADED) echo 1 ;;
+    FAULTED) echo 2 ;;
+    OFFLINE) echo 3 ;;
+    REMOVED) echo 4 ;;
+    UNAVAIL) echo 5 ;;
+    SUSPENDED) echo 6 ;;
+    *) echo 99 ;;
+  esac
+}
+
+cat > "$TMPFILE" <<'EOF'
+# HELP zfs_pool_health ZFS pool health state as one-hot metric.
+# TYPE zfs_pool_health gauge
+# HELP zfs_pool_state_code Numeric ZFS pool state code.
+# TYPE zfs_pool_state_code gauge
+# HELP zfs_pool_read_errors ZFS pool read errors.
+# TYPE zfs_pool_read_errors gauge
+# HELP zfs_pool_write_errors ZFS pool write errors.
+# TYPE zfs_pool_write_errors gauge
+# HELP zfs_pool_checksum_errors ZFS pool checksum errors.
+# TYPE zfs_pool_checksum_errors gauge
+# HELP zfs_vdev_health ZFS vdev health state as one-hot metric.
+# TYPE zfs_vdev_health gauge
+# HELP zfs_vdev_state_code Numeric ZFS vdev state code.
+# TYPE zfs_vdev_state_code gauge
+# HELP zfs_vdev_read_errors ZFS vdev read errors.
+# TYPE zfs_vdev_read_errors gauge
+# HELP zfs_vdev_write_errors ZFS vdev write errors.
+# TYPE zfs_vdev_write_errors gauge
+# HELP zfs_vdev_checksum_errors ZFS vdev checksum errors.
+# TYPE zfs_vdev_checksum_errors gauge
+EOF
+
+zpool list -H -o name,health | while read -r pool health; do
+  code="$(state_code "$health")"
+
+  for st in ONLINE DEGRADED FAULTED OFFLINE REMOVED UNAVAIL SUSPENDED; do
+    val=0
+    [[ "$health" == "$st" ]] && val=1
+    printf 'zfs_pool_health{pool="%s",state="%s"} %s\n' "$pool" "$st" "$val" >> "$TMPFILE"
+  done
+
+  printf 'zfs_pool_state_code{pool="%s"} %s\n' "$pool" "$code" >> "$TMPFILE"
+done
+
+zpool status -P | awk '
+  BEGIN { pool=""; intable=0 }
+  /^  pool: / { pool=$2; next }
+  /^[[:space:]]*NAME[[:space:]]+STATE[[:space:]]+READ[[:space:]]+WRITE[[:space:]]+CKSUM/ { intable=1; next }
+  intable && /^errors:/ { intable=0; next }
+  intable && NF >= 5 {
+    name=$1
+    state=$2
+    r=$3
+    w=$4
+    c=$5
+
+    if (name == pool) {
+      printf "POOL %s %s %s %s %s\n", pool, state, r, w, c
+    } else if (name != "NAME") {
+      printf "VDEV %s %s %s %s %s %s\n", pool, name, state, r, w, c
+    }
+  }
+' | while read -r kind pool name_or_state state_or_r r_or_w w_or_c maybe_c; do
+  if [[ "$kind" == "POOL" ]]; then
+    pool="$pool"
+    state="$name_or_state"
+    r="$state_or_r"
+    w="$r_or_w"
+    c="$w_or_c"
+
+    printf 'zfs_pool_read_errors{pool="%s"} %s\n' "$pool" "$r" >> "$TMPFILE"
+    printf 'zfs_pool_write_errors{pool="%s"} %s\n' "$pool" "$w" >> "$TMPFILE"
+    printf 'zfs_pool_checksum_errors{pool="%s"} %s\n' "$pool" "$c" >> "$TMPFILE"
+
+  elif [[ "$kind" == "VDEV" ]]; then
+    pool="$pool"
+    vdev="$name_or_state"
+    state="$state_or_r"
+    r="$r_or_w"
+    w="$w_or_c"
+    c="$maybe_c"
+    code="$(state_code "$state")"
+
+    for st in ONLINE DEGRADED FAULTED OFFLINE REMOVED UNAVAIL SUSPENDED; do
+      val=0
+      [[ "$state" == "$st" ]] && val=1
+      printf 'zfs_vdev_health{pool="%s",vdev="%s",state="%s"} %s\n' "$pool" "$vdev" "$st" "$val" >> "$TMPFILE"
+    done
+
+    printf 'zfs_vdev_state_code{pool="%s",vdev="%s"} %s\n' "$pool" "$vdev" "$code" >> "$TMPFILE"
+    printf 'zfs_vdev_read_errors{pool="%s",vdev="%s"} %s\n' "$pool" "$vdev" "$r" >> "$TMPFILE"
+    printf 'zfs_vdev_write_errors{pool="%s",vdev="%s"} %s\n' "$pool" "$vdev" "$w" >> "$TMPFILE"
+    printf 'zfs_vdev_checksum_errors{pool="%s",vdev="%s"} %s\n' "$pool" "$vdev" "$c" >> "$TMPFILE"
+  fi
+done
+
+mv "$TMPFILE" "{{ zfs_textfile_output_file }}"
+chown prometheus:prometheus "{{ zfs_textfile_output_file }}"
+chmod 0644 "{{ zfs_textfile_output_file }}"

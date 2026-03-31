@@ -1,4 +1,81 @@
-- name: ZFS textfile setup not implemented yet
+- name: Ensure node exporter defaults file includes textfile collector
+  lineinfile:
+    path: /etc/default/prometheus-node-exporter
+    regexp: '^ARGS='
+    line: 'ARGS="--collector.textfile.directory={{ zfs_textfile_directory }}"'
+    create: true
+  notify: Restart prometheus node exporter
+  when: zfs_textfile_enabled
+
+- name: Ensure ZFS textfile collector directory exists
+  file:
+    path: "{{ zfs_textfile_directory }}"
+    state: directory
+    owner: prometheus
+    group: prometheus
+    mode: "0755"
+  when: zfs_textfile_enabled
+
+- name: Deploy ZFS textfile exporter script
+  template:
+    src: zfs-textfile-exporter.sh.j2
+    dest: "{{ zfs_textfile_script_path }}"
+    owner: root
+    group: root
+    mode: "0755"
+  when: zfs_textfile_enabled
+
+- name: Deploy ZFS textfile exporter service
+  template:
+    src: zfs-textfile-exporter.service.j2
+    dest: /etc/systemd/system/{{ zfs_textfile_service_name }}
+    owner: root
+    group: root
+    mode: "0644"
+  when: zfs_textfile_enabled
+
+- name: Deploy ZFS textfile exporter timer
+  template:
+    src: zfs-textfile-exporter.timer.j2
+    dest: /etc/systemd/system/{{ zfs_textfile_timer_name }}
+    owner: root
+    group: root
+    mode: "0644"
+  when: zfs_textfile_enabled
+
+- name: Reload systemd
+  systemd:
+    daemon_reload: true
+  when: zfs_textfile_enabled
+
+- name: Restart prometheus node exporter
+  service:
+    name: "{{ node_exporter_service_name }}"
+    state: restarted
+  when: zfs_textfile_enabled
+
+- name: Enable and start ZFS textfile exporter timer
+  systemd:
+    name: "{{ zfs_textfile_timer_name }}"
+    enabled: true
+    state: started
+  when: zfs_textfile_enabled
+
+- name: Run ZFS textfile exporter once immediately
+  systemd:
+    name: "{{ zfs_textfile_service_name }}"
+    state: started
+  when: zfs_textfile_enabled
+
+- name: Check whether zfs.prom exists
+  stat:
+    path: "{{ zfs_textfile_output_file }}"
+  register: zfs_prom_file
+  when: zfs_textfile_enabled
+
+- name: Show ZFS textfile status
   debug:
-    msg: "zfs_textfile task file not implemented yet"
-  when: false
+    msg:
+      - "zfs.prom exists: {{ zfs_prom_file.stat.exists }}"
+      - "zfs.prom path: {{ zfs_textfile_output_file }}"
+  when: zfs_textfile_enabled
