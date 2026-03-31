@@ -1,0 +1,5 @@
+.vscode/
+*.retry
+__pycache__/
+*.pyc
+inventories/local/group_vars/all/vault.yml

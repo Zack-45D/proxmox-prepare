@@ -1,0 +1,5 @@
+- name: Install base packages for Proxmox monitoring prep
+  apt:
+    name: "{{ proxmox_prepare_packages }}"
+    state: present
+    update_cache: true

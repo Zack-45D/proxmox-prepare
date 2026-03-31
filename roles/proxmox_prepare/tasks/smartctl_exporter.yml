@@ -1,0 +1,4 @@
+- name: smartctl exporter not enabled yet
+  debug:
+    msg: "smartctl_exporter_enabled is false or this task file is not implemented yet"
+  when: false

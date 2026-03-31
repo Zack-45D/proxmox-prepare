@@ -1,0 +1,4 @@
+- name: ZFS textfile setup not implemented yet
+  debug:
+    msg: "zfs_textfile task file not implemented yet"
+  when: false

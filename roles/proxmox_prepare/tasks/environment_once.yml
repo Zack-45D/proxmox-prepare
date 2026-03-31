@@ -1,0 +1,6 @@
+- name: Enable Ceph Prometheus manager module once
+  command: ceph mgr module enable prometheus
+  run_once: true
+  changed_when: false
+  failed_when: false
+  when: ceph_enable_prometheus_module

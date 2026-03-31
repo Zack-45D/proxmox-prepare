@@ -1,0 +1,6 @@
+- import_tasks: environment_once.yml
+- import_tasks: packages.yml
+- import_tasks: node_exporter.yml
+- import_tasks: smartctl_exporter.yml
+- import_tasks: zfs_textfile.yml
+- import_tasks: validation.yml

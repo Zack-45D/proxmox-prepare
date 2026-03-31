@@ -1,0 +1,28 @@
+proxmox_prepare_packages:
+  - prometheus-node-exporter
+  - smartmontools
+  - curl
+  - jq
+
+node_exporter_enabled: true
+node_exporter_service_name: prometheus-node-exporter
+node_exporter_port: 9100
+
+smartctl_exporter_enabled: false
+smartctl_exporter_version: "0.14.0"
+smartctl_exporter_arch: "amd64"
+smartctl_exporter_port: 9633
+
+zfs_textfile_enabled: true
+zfs_textfile_directory: /var/lib/node_exporter/textfile_collector
+zfs_textfile_script_path: /usr/local/bin/zfs-textfile-exporter.sh
+
+ceph_validation_enabled: true
+ceph_metrics_port: 9283
+ceph_enable_prometheus_module: true
+
+proxmox_api_port: 8006
+
+proxmox_monitoring_user_create: false
+proxmox_monitoring_user: "prometheus@pve"
+proxmox_monitoring_token_name: "monitoring"
