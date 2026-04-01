@@ -27,7 +27,3 @@ ceph_metrics_port: 9283
 ceph_enable_prometheus_module: true
 
 proxmox_api_port: 8006
-
-proxmox_monitoring_user_create: false
-proxmox_monitoring_user: "prometheus@pve"
-proxmox_monitoring_token_name: "monitoring"
