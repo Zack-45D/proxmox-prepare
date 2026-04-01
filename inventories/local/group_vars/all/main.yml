@@ -8,10 +8,12 @@ node_exporter_enabled: true
 node_exporter_service_name: prometheus-node-exporter
 node_exporter_port: 9100
 
-smartctl_exporter_enabled: false
+smartctl_exporter_enabled: true
 smartctl_exporter_version: "0.14.0"
 smartctl_exporter_arch: "amd64"
 smartctl_exporter_port: 9633
+smartctl_exporter_binary_path: /usr/local/bin/smartctl_exporter
+smartctl_exporter_service_name: smartctl-exporter
 
 zfs_textfile_enabled: true
 zfs_textfile_directory: /var/lib/node_exporter/textfile_collector

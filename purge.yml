@@ -5,8 +5,9 @@
   vars:
     purge_remove_packages: false
     purge_remove_textfile_data: true
-    purge_remove_smartctl_exporter: false
+    purge_remove_smartctl_exporter: true
     purge_remove_monitoring_user: false
+    purge_remove_ceph_prometheus_module: false
 
   tasks:
     - name: Stop ZFS textfile exporter timer
@@ -65,7 +66,33 @@
         state: absent
       failed_when: false
 
-    - name: Reload systemd after removing ZFS units
+    - name: Stop smartctl exporter service
+      systemd:
+        name: "{{ smartctl_exporter_service_name }}"
+        state: stopped
+        enabled: false
+      failed_when: false
+      when: purge_remove_smartctl_exporter
+
+    - name: Remove smartctl exporter unit
+      file:
+        path: "/etc/systemd/system/{{ smartctl_exporter_service_name }}.service"
+        state: absent
+      when: purge_remove_smartctl_exporter
+
+    - name: Remove smartctl exporter binary
+      file:
+        path: "{{ smartctl_exporter_binary_path }}"
+        state: absent
+      when: purge_remove_smartctl_exporter
+
+    - name: Remove temporary smartctl exporter working directory
+      file:
+        path: /tmp/smartctl-exporter
+        state: absent
+      when: purge_remove_smartctl_exporter
+
+    - name: Reload systemd after removing custom units
       systemd:
         daemon_reload: true
 
@@ -76,26 +103,6 @@
       failed_when: false
       when: node_exporter_enabled
 
-    - name: Stop smartctl exporter service
-      systemd:
-        name: smartctl-exporter
-        state: stopped
-        enabled: false
-      failed_when: false
-      when: purge_remove_smartctl_exporter
-
-    - name: Remove smartctl exporter unit
-      file:
-        path: /etc/systemd/system/smartctl-exporter.service
-        state: absent
-      when: purge_remove_smartctl_exporter
-
-    - name: Remove smartctl exporter binary
-      file:
-        path: /usr/local/bin/smartctl_exporter
-        state: absent
-      when: purge_remove_smartctl_exporter
-
     - name: Remove base packages installed by this repo
       apt:
         name: "{{ proxmox_prepare_packages }}"
@@ -103,6 +110,12 @@
         purge: true
         autoremove: true
       when: purge_remove_packages
+
+    - name: Disable Ceph Prometheus manager module once
+      command: ceph mgr module disable prometheus
+      run_once: true
+      failed_when: false
+      when: purge_remove_ceph_prometheus_module
 
     - name: Remove Proxmox monitoring ACL once
       command: "pveum acl delete / --users {{ proxmox_monitoring_user }} --roles PVEAuditor"
